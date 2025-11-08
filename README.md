@@ -1,37 +1,26 @@
 # 🎬 Plataforma de Avaliação de Filmes com Cassandra
 
-![Node.js](https://img.shields.io/badge/Node.js-18.x-blue.svg?logo=node.js)![Express.js](https://img.shields.io/badge/Express.js-4.x-green.svg?logo=express)![Cassandra](https://img.shields.io/badge/Cassandra-Apache-blue.svg?logo=apachecassandra)![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-yellow.svg?logo=javascript)
+![Node.js](https://img.shields.io/badge/Node.js-18.x-blue.svg?logo=node.js)![Express.js](https://img.shields.io/badge/Express.js-5.x-green.svg?logo=express)![Cassandra](https://img.shields.io/badge/Cassandra-Apache-blue.svg?logo=apachecassandra)![Docker](https://img.shields.io/badge/Docker-blue?logo=docker&logoColor=white)
 
 ## 📌 Visão Geral
 
 Este projeto é uma atividade da matéria de **NoSQL** que implementa uma aplicação web para avaliação de filmes. O backend foi desenvolvido com **Node.js** e **Express.js**, utilizando **Apache Cassandra** como banco de dados.
 
-A modelagem dos dados foi projetada seguindo os princípios do Cassandra, com foco em padrões de consulta. Foram criadas tabelas otimizadas com chaves de partição e de cluster para garantir a performance nas operações de listagem de filmes e busca de avaliações.
-
-## ✨ Funcionalidades
-
--   **Frontend Simples:** Interface para cadastrar novos filmes, listar os existentes e registrar avaliações.
--   **API RESTful:** Endpoints para todas as operações de CRUD (Criar, Ler, Atualizar, Deletar).
--   **Persistência com Cassandra:** Utiliza um `keyspace` e tabelas modeladas para performance, armazenando filmes e suas respectivas avaliações.
--   **Estrutura Organizada:** O código separa a lógica de conexão com o banco da lógica do servidor, seguindo boas práticas.
+A modelagem dos dados foi projetada seguindo os princípios do Cassandra, com foco em padrões de consulta. Foram criadas tabelas otimizadas com chaves de partição e de cluster para garantir a performance nas operações de listagem de filmes e busca de avaliações. A aplicação é totalmente containerizada com Docker para facilitar a execução e garantir a consistência do ambiente.
 
 ## 🛠️ Tecnologias Utilizadas
 
--   **Backend:**
-    -   [Node.js](https://nodejs.org/) (Runtime JavaScript)
-    -   [Express.js](https://expressjs.com/) (Framework para o servidor web)
--   **Banco de Dados:**
-    -   [Apache Cassandra](https://cassandra.apache.org/) (Banco de dados NoSQL colunar)
--   **Frontend:**
-    -   HTML5, CSS3, JavaScript (Vanilla)
--   **Driver Cassandra:**
-    -   `cassandra-driver`: Cliente oficial para a comunicação entre Node.js e Cassandra.
+-   **Backend:** Node.js, Express.js
+-   **Banco de Dados:** Apache Cassandra
+-   **Containerização:** Docker
+-   **Frontend:** HTML5, CSS3, JavaScript (Vanilla)
+-   **Driver:** `cassandra-driver`
 
 ## 📋 Pré-requisitos
 
--   **[Node.js](https://nodejs.org/en/)** (versão 18 ou superior)
+-   **[Node.js](https://nodejs.org/en/)** (versão 18 ou superior) - *Opcional se usar Docker*
 -   **[Git](https://git-scm.com/downloads/)**
--   Uma instância do **Cassandra** em execução. (Recomendado usar [Docker](https://www.docker.com/products/docker-desktop/) com `docker run -d --name cassandra cassandra:latest`).
+-   **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** - **Essencial para o método de execução principal.**
 
 ## 📂 Estrutura do Projeto
 
@@ -42,12 +31,15 @@ app-filmes-cassandra/
 │   └── index.html          # Frontend da aplicação
 ├── cassandra.js            # Módulo de conexão com o Cassandra
 ├── server.js               # Lógica do backend e endpoints da API
+├── Dockerfile              # Instruções para construir a imagem da aplicação
 ├── .gitignore              # Ignora a pasta node_modules
 ├── package.json            # Metadados e dependências do projeto
 └── README.md                 # Este arquivo
 ```
 
-## ▶️ Como Executar (Localmente)
+## ▶️ Como Executar com Docker (Método Recomendado)
+
+Este método utiliza Docker para criar um ambiente completo e isolado na sua máquina local, garantindo que tudo funcione sem a necessidade de instalar Node.js ou Cassandra diretamente.
 
 1.  **Clone o repositório:**
     ```bash
@@ -55,14 +47,30 @@ app-filmes-cassandra/
     cd app-filmes-cassandra
     ```
 
-2.  **Instale as dependências:**
+2.  **Construa e Inicie os Containers:**
+    Execute os comandos abaixo na ordem. Eles criarão uma rede, iniciarão o banco de dados e, em seguida, construirão e iniciarão a aplicação.
     ```bash
-    npm install
+    # 1. Cria a rede para comunicação entre os containers
+    docker network create cassandra-net
+
+    # 2. Inicia o container do Cassandra
+    docker run -d --name cassandra --hostname cassandra --network cassandra-net cassandra:latest
+
+    # 3. Constrói a imagem da aplicação Node.js a partir do Dockerfile
+    docker build -t app-filmes-cassandra .
+
+    # 4. Inicia o container da aplicação, conectando-o à mesma rede
+    docker run -d -p 3000:3000 --name app-filmes --network cassandra-net app-filmes-cassandra
     ```
 
-3.  **Configure e Prepare o Banco de Dados:**
-    -   Inicie sua instância do Cassandra.
-    -   Acesse o `cqlsh` e execute os comandos abaixo para criar o schema:
+3.  **Prepare o Banco de Dados (Schema CQL):**
+    O container do Cassandra pode levar um minuto para inicializar. **Aguarde um pouco** antes de executar o próximo passo.
+    -   Para verificar se o Cassandra está pronto, execute `docker logs -f cassandra` e espere pela mensagem `Starting listening for CQL clients`.
+    -   Quando estiver pronto, execute o comando abaixo para entrar no shell do Cassandra:
+    ```bash
+    docker exec -it cassandra cqlsh
+    ```
+    -   Dentro do `cqlsh`, cole o bloco de código abaixo para criar o `keyspace` e as tabelas:
     ```sql
     CREATE KEYSPACE IF NOT EXISTS avaliacao_filmes
     WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
@@ -79,18 +87,10 @@ app-filmes-cassandra/
         PRIMARY KEY (id_filme, data_avaliacao)
     ) WITH CLUSTERING ORDER BY (data_avaliacao DESC);
     ```
+    -   Saia do `cqlsh` com o comando `exit;`.
 
-4.  **Configure a Conexão no Código:**
-    -   Abra o arquivo `cassandra.js`.
-    -   Altere o placeholder `<IP_DO_SEU_CONTAINER>` para o endereço IP da sua instância Cassandra (ex: `127.0.0.1` se estiver rodando localmente).
-
-5.  **Inicie o servidor:**
-    ```bash
-    node server.js
-    ```
-
-6.  **Acesse a aplicação:**
-    Abra seu navegador e acesse `http://localhost:3000`.
+4.  **Acesse a Aplicação:**
+    Pronto! Abra seu navegador e acesse `http://localhost:3000`.
 
 <br>
 
@@ -100,9 +100,9 @@ app-filmes-cassandra/
 
 ## 🌐 Execução Alternativa no Docker Playground
 
-Este projeto também pode ser executado inteiramente no Docker Playground, seguindo os passos abaixo.
+Para um ambiente online e temporário, siga estes passos.
 
-**1. Prepare o Ambiente:**
+**1. Prepare o Ambiente no Playground:**
 -   Acesse o [Docker Playground](https://labs.play-with-docker.com/) e crie **uma nova instância**.
 -   No terminal, inicie o container do Cassandra:
     ```bash
@@ -115,11 +115,9 @@ Este projeto também pode ser executado inteiramente no Docker Playground, segui
     ```
 
 **2. Configure o Banco de Dados:**
--   Acesse o `cqlsh` do container:
-    ```bash
-    docker exec -it cassandra cqlsh
-    ```
--   Execute os comandos SQL da **Etapa 3** da seção "Como Executar (Localmente)" para criar o `keyspace` e as tabelas. Após terminar, saia com `exit;`.
+-   Aguarde um minuto para o Cassandra iniciar.
+-   Acesse o `cqlsh` do container: `docker exec -it cassandra cqlsh`.
+-   Execute os comandos SQL da **Etapa 3** da seção "Como Executar com Docker" para criar o schema. Saia com `exit;`.
 
 **3. Configure a Aplicação:**
 -   No terminal principal, instale as ferramentas, clone este repositório e instale as dependências:
@@ -132,10 +130,10 @@ Este projeto também pode ser executado inteiramente no Docker Playground, segui
 
 **4. Conecte a Aplicação ao Cassandra:**
 -   Use o editor do Docker Playground (botão **EDITOR**) para abrir o arquivo `cassandra.js`.
--   Altere o placeholder `<IP_DO_SEU_CONTAINER>` para o IP que você anotou no primeiro passo.
+-   **Importante:** Altere a linha `contactPoints: ['cassandra']` para `contactPoints: ['<IP_QUE_VOCE_ANOTOU>']`.
 -   Salve o arquivo.
 
 **5. Execute e Acesse:**
--   No terminal, na pasta do projeto, inicie o servidor: `node server.js`.
+-   No terminal, inicie o servidor: `node server.js`.
 -   Clique em **[OPEN PORT]**, digite `3000` e confirme.
--   Clique no novo botão azul **3000** que aparecerá para abrir a aplicação! 🎉
+-   Clique no novo botão azul **3000** para abrir a aplicação! 🎉
